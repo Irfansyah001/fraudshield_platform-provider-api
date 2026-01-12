@@ -1,11 +1,19 @@
-const db = require('../config/db');
-const response = require('../utils/response');
-const { hashPassword } = require('../utils/crypto');
+const db = require("../config/db");
+const response = require("../utils/response");
+const { hashPassword } = require("../utils/crypto");
 
 /**
  * Helper untuk mencatat audit log admin
  */
-async function logAdminAction(adminId, action, entityType, entityId, oldValues, newValues, req) {
+async function logAdminAction(
+  adminId,
+  action,
+  entityType,
+  entityId,
+  oldValues,
+  newValues,
+  req
+) {
   try {
     await db.insert(
       `INSERT INTO admin_audit_logs 
@@ -19,11 +27,11 @@ async function logAdminAction(adminId, action, entityType, entityId, oldValues, 
         oldValues ? JSON.stringify(oldValues) : null,
         newValues ? JSON.stringify(newValues) : null,
         req.ip || req.connection?.remoteAddress || null,
-        req.get('User-Agent') || null,
+        req.get("User-Agent") || null,
       ]
     );
   } catch (err) {
-    console.error('Failed to log admin action:', err);
+    console.error("Failed to log admin action:", err);
   }
 }
 
@@ -35,24 +43,24 @@ async function logAdminAction(adminId, action, entityType, entityId, oldValues, 
 async function getUsers(req, res) {
   const pageNum = parseInt(req.query.page) || 1;
   const limitNum = parseInt(req.query.limit) || 20;
-  const search = req.query.search || '';
-  const status = req.query.status || '';
-  const role = req.query.role || '';
+  const search = req.query.search || "";
+  const status = req.query.status || "";
+  const role = req.query.role || "";
   const offset = (pageNum - 1) * limitNum;
 
-  let whereClause = '1=1';
+  let whereClause = "1=1";
   const params = [];
 
   if (search) {
-    whereClause += ' AND (name LIKE ? OR email LIKE ?)';
+    whereClause += " AND (name LIKE ? OR email LIKE ?)";
     params.push(`%${search}%`, `%${search}%`);
   }
   if (status) {
-    whereClause += ' AND status = ?';
+    whereClause += " AND status = ?";
     params.push(status);
   }
   if (role) {
-    whereClause += ' AND role = ?';
+    whereClause += " AND role = ?";
     params.push(role);
   }
 
@@ -94,20 +102,20 @@ async function getUserById(req, res) {
   );
 
   if (!user) {
-    return response.notFound(res, 'User tidak ditemukan');
+    return response.notFound(res, "User tidak ditemukan");
   }
 
   // Ambil statistik user
   const keyCount = await db.queryOne(
-    'SELECT COUNT(*) as count FROM api_keys WHERE user_id = ?',
+    "SELECT COUNT(*) as count FROM api_keys WHERE user_id = ?",
     [id]
   );
   const blacklistCount = await db.queryOne(
-    'SELECT COUNT(*) as count FROM blacklist_entries WHERE user_id = ?',
+    "SELECT COUNT(*) as count FROM blacklist_entries WHERE user_id = ?",
     [id]
   );
   const usageCount = await db.queryOne(
-    'SELECT COUNT(*) as count FROM api_usage_logs WHERE user_id = ?',
+    "SELECT COUNT(*) as count FROM api_usage_logs WHERE user_id = ?",
     [id]
   );
 
@@ -125,36 +133,47 @@ async function getUserById(req, res) {
  * Membuat user baru
  */
 async function createUser(req, res) {
-  const { name, email, password, role = 'user' } = req.body;
+  const { name, email, password, role = "user" } = req.body;
 
   if (!name || !email || !password) {
-    return response.badRequest(res, 'Name, email, dan password wajib diisi');
+    return response.badRequest(res, "Name, email, dan password wajib diisi");
   }
 
-  if (!['user', 'admin'].includes(role)) {
-    return response.badRequest(res, 'Role harus user atau admin');
+  if (!["user", "admin"].includes(role)) {
+    return response.badRequest(res, "Role harus user atau admin");
   }
 
-  const existingUser = await db.queryOne('SELECT id FROM users WHERE email = ?', [email]);
+  const existingUser = await db.queryOne(
+    "SELECT id FROM users WHERE email = ?",
+    [email]
+  );
   if (existingUser) {
-    return response.conflict(res, 'Email sudah terdaftar');
+    return response.conflict(res, "Email sudah terdaftar");
   }
 
   const passwordHash = await hashPassword(password);
   const userId = await db.insert(
-    'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)',
+    "INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)",
     [name, email, passwordHash, role]
   );
 
   const user = await db.queryOne(
-    'SELECT id, name, email, role, status, created_at FROM users WHERE id = ?',
+    "SELECT id, name, email, role, status, created_at FROM users WHERE id = ?",
     [userId]
   );
 
-  await logAdminAction(req.user.id, 'CREATE', 'user', userId, null, { name, email, role }, req);
+  await logAdminAction(
+    req.user.id,
+    "CREATE",
+    "user",
+    userId,
+    null,
+    { name, email, role },
+    req
+  );
 
   return response.created(res, {
-    message: 'User berhasil dibuat',
+    message: "User berhasil dibuat",
     user,
   });
 }
@@ -166,9 +185,11 @@ async function updateUser(req, res) {
   const { id } = req.params;
   const { name, email, role, status, password } = req.body;
 
-  const existingUser = await db.queryOne('SELECT * FROM users WHERE id = ?', [id]);
+  const existingUser = await db.queryOne("SELECT * FROM users WHERE id = ?", [
+    id,
+  ]);
   if (!existingUser) {
-    return response.notFound(res, 'User tidak ditemukan');
+    return response.notFound(res, "User tidak ditemukan");
   }
 
   // Simpan data lama untuk audit
@@ -184,49 +205,60 @@ async function updateUser(req, res) {
   const params = [];
 
   if (name) {
-    updates.push('name = ?');
+    updates.push("name = ?");
     params.push(name);
   }
   if (email && email !== existingUser.email) {
-    const emailExists = await db.queryOne('SELECT id FROM users WHERE email = ? AND id != ?', [email, id]);
+    const emailExists = await db.queryOne(
+      "SELECT id FROM users WHERE email = ? AND id != ?",
+      [email, id]
+    );
     if (emailExists) {
-      return response.conflict(res, 'Email sudah digunakan');
+      return response.conflict(res, "Email sudah digunakan");
     }
-    updates.push('email = ?');
+    updates.push("email = ?");
     params.push(email);
   }
-  if (role && ['user', 'admin'].includes(role)) {
-    updates.push('role = ?');
+  if (role && ["user", "admin"].includes(role)) {
+    updates.push("role = ?");
     params.push(role);
   }
-  if (status && ['active', 'suspended'].includes(status)) {
-    updates.push('status = ?');
+  if (status && ["active", "suspended"].includes(status)) {
+    updates.push("status = ?");
     params.push(status);
   }
   if (password) {
     const passwordHash = await hashPassword(password);
-    updates.push('password_hash = ?');
+    updates.push("password_hash = ?");
     params.push(passwordHash);
   }
 
   if (updates.length === 0) {
-    return response.badRequest(res, 'Tidak ada data untuk diupdate');
+    return response.badRequest(res, "Tidak ada data untuk diupdate");
   }
 
-  updates.push('updated_at = NOW()');
+  updates.push("updated_at = NOW()");
   params.push(id);
 
-  await db.query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
+  await db.query(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`, params);
 
   const user = await db.queryOne(
-    'SELECT id, name, email, role, status, created_at, updated_at FROM users WHERE id = ?',
+    "SELECT id, name, email, role, status, created_at, updated_at FROM users WHERE id = ?",
     [id]
   );
 
-  await logAdminAction(req.user.id, 'UPDATE', 'user', id, oldValues, { name, email, role, status }, req);
+  await logAdminAction(
+    req.user.id,
+    "UPDATE",
+    "user",
+    id,
+    oldValues,
+    { name, email, role, status },
+    req
+  );
 
   return response.success(res, {
-    message: 'User berhasil diupdate',
+    message: "User berhasil diupdate",
     user,
   });
 }
@@ -238,26 +270,35 @@ async function deleteUser(req, res) {
   const { id } = req.params;
 
   if (parseInt(id) === req.user.id) {
-    return response.badRequest(res, 'Tidak dapat menghapus akun sendiri');
+    return response.badRequest(res, "Tidak dapat menghapus akun sendiri");
   }
 
-  const user = await db.queryOne('SELECT id, name, email, role FROM users WHERE id = ?', [id]);
+  const user = await db.queryOne(
+    "SELECT id, name, email, role FROM users WHERE id = ?",
+    [id]
+  );
   if (!user) {
-    return response.notFound(res, 'User tidak ditemukan');
+    return response.notFound(res, "User tidak ditemukan");
   }
 
   // Hapus data terkait
-  await db.query('DELETE FROM api_usage_logs WHERE user_id = ?', [id]);
-  await db.query('DELETE FROM transactions WHERE user_id = ?', [id]);
-  await db.query('DELETE FROM blacklist_entries WHERE user_id = ?', [id]);
-  await db.query('DELETE FROM api_keys WHERE user_id = ?', [id]);
-  await db.query('DELETE FROM password_resets WHERE user_id = ?', [id]);
-  await db.query('DELETE FROM users WHERE id = ?', [id]);
+  // Hapus data terkait
+  await db.query("DELETE FROM api_usage_logs WHERE user_id = ?", [id]);
 
-  await logAdminAction(req.user.id, 'DELETE', 'user', id, user, null, req);
+  // NOTE:
+  // transactions tidak punya kolom user_id.
+  // Transaksi akan otomatis terhapus saat api_keys user dihapus
+  // karena FK transactions(api_key_id) -> api_keys(id) ON DELETE CASCADE.
+
+  await db.query("DELETE FROM blacklist_entries WHERE user_id = ?", [id]);
+  await db.query("DELETE FROM api_keys WHERE user_id = ?", [id]);
+  await db.query("DELETE FROM password_resets WHERE user_id = ?", [id]);
+  await db.query("DELETE FROM users WHERE id = ?", [id]);
+
+  await logAdminAction(req.user.id, "DELETE", "user", id, user, null, req);
 
   return response.success(res, {
-    message: 'User berhasil dihapus',
+    message: "User berhasil dihapus",
   });
 }
 
@@ -269,20 +310,20 @@ async function deleteUser(req, res) {
 async function getAllApiKeys(req, res) {
   const pageNum = parseInt(req.query.page) || 1;
   const limitNum = parseInt(req.query.limit) || 20;
-  const user_id = req.query.user_id || '';
-  const status = req.query.status || '';
+  const user_id = req.query.user_id || "";
+  const status = req.query.status || "";
   const offset = (pageNum - 1) * limitNum;
 
-  let whereClause = '1=1';
+  let whereClause = "1=1";
   const params = [];
 
   if (user_id) {
-    whereClause += ' AND k.user_id = ?';
+    whereClause += " AND k.user_id = ?";
     params.push(user_id);
   }
-  if (status === 'active') {
+  if (status === "active") {
     whereClause += " AND k.status = 'ACTIVE'";
-  } else if (status === 'inactive') {
+  } else if (status === "inactive") {
     whereClause += " AND k.status = 'REVOKED'";
   }
 
@@ -319,18 +360,21 @@ async function getAllApiKeys(req, res) {
 async function toggleApiKey(req, res) {
   const { id } = req.params;
 
-  const key = await db.queryOne('SELECT * FROM api_keys WHERE id = ?', [id]);
+  const key = await db.queryOne("SELECT * FROM api_keys WHERE id = ?", [id]);
   if (!key) {
-    return response.notFound(res, 'API key tidak ditemukan');
+    return response.notFound(res, "API key tidak ditemukan");
   }
 
-  const newStatus = key.status === 'ACTIVE' ? 'REVOKED' : 'ACTIVE';
-  await db.query('UPDATE api_keys SET status = ? WHERE id = ?', [newStatus, id]);
+  const newStatus = key.status === "ACTIVE" ? "REVOKED" : "ACTIVE";
+  await db.query("UPDATE api_keys SET status = ? WHERE id = ?", [
+    newStatus,
+    id,
+  ]);
 
   await logAdminAction(
     req.user.id,
-    newStatus === 'ACTIVE' ? 'ACTIVATE' : 'REVOKE',
-    'api_key',
+    newStatus === "ACTIVE" ? "ACTIVATE" : "REVOKE",
+    "api_key",
     id,
     { status: key.status },
     { status: newStatus },
@@ -338,7 +382,9 @@ async function toggleApiKey(req, res) {
   );
 
   return response.success(res, {
-    message: `API key berhasil ${newStatus === 'ACTIVE' ? 'diaktifkan' : 'direvoke'}`,
+    message: `API key berhasil ${
+      newStatus === "ACTIVE" ? "diaktifkan" : "direvoke"
+    }`,
     status: newStatus,
   });
 }
@@ -349,17 +395,25 @@ async function toggleApiKey(req, res) {
 async function deleteApiKey(req, res) {
   const { id } = req.params;
 
-  const key = await db.queryOne('SELECT * FROM api_keys WHERE id = ?', [id]);
+  const key = await db.queryOne("SELECT * FROM api_keys WHERE id = ?", [id]);
   if (!key) {
-    return response.notFound(res, 'API key tidak ditemukan');
+    return response.notFound(res, "API key tidak ditemukan");
   }
 
-  await db.query('DELETE FROM api_keys WHERE id = ?', [id]);
+  await db.query("DELETE FROM api_keys WHERE id = ?", [id]);
 
-  await logAdminAction(req.user.id, 'DELETE', 'api_key', id, { name: key.name, user_id: key.user_id }, null, req);
+  await logAdminAction(
+    req.user.id,
+    "DELETE",
+    "api_key",
+    id,
+    { name: key.name, user_id: key.user_id },
+    null,
+    req
+  );
 
   return response.success(res, {
-    message: 'API key berhasil dihapus',
+    message: "API key berhasil dihapus",
   });
 }
 
@@ -371,25 +425,25 @@ async function deleteApiKey(req, res) {
 async function getAllBlacklist(req, res) {
   const pageNum = parseInt(req.query.page) || 1;
   const limitNum = parseInt(req.query.limit) || 20;
-  const user_id = req.query.user_id || '';
-  const type = req.query.type || '';
-  const active = req.query.active || '';
+  const user_id = req.query.user_id || "";
+  const type = req.query.type || "";
+  const active = req.query.active || "";
   const offset = (pageNum - 1) * limitNum;
 
-  let whereClause = '1=1';
+  let whereClause = "1=1";
   const params = [];
 
   if (user_id) {
-    whereClause += ' AND b.user_id = ?';
+    whereClause += " AND b.user_id = ?";
     params.push(user_id);
   }
   if (type) {
-    whereClause += ' AND b.type = ?';
+    whereClause += " AND b.type = ?";
     params.push(type);
   }
-  if (active !== '') {
-    whereClause += ' AND b.active = ?';
-    params.push(active === 'true');
+  if (active !== "") {
+    whereClause += " AND b.active = ?";
+    params.push(active === "true");
   }
 
   const countResult = await db.queryOne(
@@ -425,18 +479,24 @@ async function getAllBlacklist(req, res) {
 async function toggleBlacklistEntry(req, res) {
   const { id } = req.params;
 
-  const entry = await db.queryOne('SELECT * FROM blacklist_entries WHERE id = ?', [id]);
+  const entry = await db.queryOne(
+    "SELECT * FROM blacklist_entries WHERE id = ?",
+    [id]
+  );
   if (!entry) {
-    return response.notFound(res, 'Entry tidak ditemukan');
+    return response.notFound(res, "Entry tidak ditemukan");
   }
 
   const newStatus = !entry.active;
-  await db.query('UPDATE blacklist_entries SET active = ? WHERE id = ?', [newStatus, id]);
+  await db.query("UPDATE blacklist_entries SET active = ? WHERE id = ?", [
+    newStatus,
+    id,
+  ]);
 
   await logAdminAction(
     req.user.id,
-    newStatus ? 'ACTIVATE' : 'DEACTIVATE',
-    'blacklist_entry',
+    newStatus ? "ACTIVATE" : "DEACTIVATE",
+    "blacklist_entry",
     id,
     { active: entry.active },
     { active: newStatus },
@@ -444,7 +504,7 @@ async function toggleBlacklistEntry(req, res) {
   );
 
   return response.success(res, {
-    message: `Entry berhasil ${newStatus ? 'diaktifkan' : 'dinonaktifkan'}`,
+    message: `Entry berhasil ${newStatus ? "diaktifkan" : "dinonaktifkan"}`,
     active: newStatus,
   });
 }
@@ -455,17 +515,28 @@ async function toggleBlacklistEntry(req, res) {
 async function deleteBlacklistEntry(req, res) {
   const { id } = req.params;
 
-  const entry = await db.queryOne('SELECT * FROM blacklist_entries WHERE id = ?', [id]);
+  const entry = await db.queryOne(
+    "SELECT * FROM blacklist_entries WHERE id = ?",
+    [id]
+  );
   if (!entry) {
-    return response.notFound(res, 'Entry tidak ditemukan');
+    return response.notFound(res, "Entry tidak ditemukan");
   }
 
-  await db.query('DELETE FROM blacklist_entries WHERE id = ?', [id]);
+  await db.query("DELETE FROM blacklist_entries WHERE id = ?", [id]);
 
-  await logAdminAction(req.user.id, 'DELETE', 'blacklist_entry', id, entry, null, req);
+  await logAdminAction(
+    req.user.id,
+    "DELETE",
+    "blacklist_entry",
+    id,
+    entry,
+    null,
+    req
+  );
 
   return response.success(res, {
-    message: 'Entry berhasil dihapus',
+    message: "Entry berhasil dihapus",
   });
 }
 
@@ -477,25 +548,25 @@ async function deleteBlacklistEntry(req, res) {
 async function getAllTransactions(req, res) {
   const pageNum = parseInt(req.query.page) || 1;
   const limitNum = parseInt(req.query.limit) || 50;
-  const user_id = req.query.user_id || '';
-  const date_from = req.query.date_from || '';
-  const date_to = req.query.date_to || '';
+  const user_id = req.query.user_id || "";
+  const date_from = req.query.date_from || "";
+  const date_to = req.query.date_to || "";
   const offset = (pageNum - 1) * limitNum;
 
-  let whereClause = '1=1';
+  let whereClause = "1=1";
   const params = [];
 
   if (user_id) {
-    whereClause += ' AND k.user_id = ?';
+    whereClause += " AND k.user_id = ?";
     params.push(user_id);
   }
   if (date_from) {
-    whereClause += ' AND t.created_at >= ?';
+    whereClause += " AND t.created_at >= ?";
     params.push(date_from);
   }
   if (date_to) {
-    whereClause += ' AND t.created_at <= ?';
-    params.push(date_to + ' 23:59:59');
+    whereClause += " AND t.created_at <= ?";
+    params.push(date_to + " 23:59:59");
   }
 
   const countResult = await db.queryOne(
@@ -534,11 +605,18 @@ async function getAllTransactions(req, res) {
  * Mendapatkan statistik global
  */
 async function getGlobalStats(req, res) {
-  const [users, apiKeys, blacklist, transactions, apiUsage] = await Promise.all([
-    db.queryOne('SELECT COUNT(*) as total, SUM(role = "admin") as admins, SUM(status = "suspended") as suspended FROM users'),
-    db.queryOne("SELECT COUNT(*) as total, SUM(status = 'ACTIVE') as active FROM api_keys"),
-    db.queryOne('SELECT COUNT(*) as total, SUM(active = TRUE) as active FROM blacklist_entries'),
-    db.queryOne(`
+  const [users, apiKeys, blacklist, transactions, apiUsage] = await Promise.all(
+    [
+      db.queryOne(
+        'SELECT COUNT(*) as total, SUM(role = "admin") as admins, SUM(status = "suspended") as suspended FROM users'
+      ),
+      db.queryOne(
+        "SELECT COUNT(*) as total, SUM(status = 'ACTIVE') as active FROM api_keys"
+      ),
+      db.queryOne(
+        "SELECT COUNT(*) as total, SUM(active = TRUE) as active FROM blacklist_entries"
+      ),
+      db.queryOne(`
       SELECT 
         COUNT(*) as total,
         AVG(risk_score) as avg_score,
@@ -547,14 +625,15 @@ async function getGlobalStats(req, res) {
         SUM(decision = 'DECLINE') as decline
       FROM transactions
     `),
-    db.queryOne(`
+      db.queryOne(`
       SELECT 
         COUNT(*) as total,
         SUM(DATE(created_at) = CURDATE()) as today,
         SUM(created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as last_7_days
       FROM api_usage_logs
     `),
-  ]);
+    ]
+  );
 
   // Top users by API usage
   const topUsers = await db.query(`
@@ -591,7 +670,9 @@ async function getGlobalStats(req, res) {
     },
     transactions: {
       total: transactions?.total || 0,
-      avg_score: transactions?.avg_score ? parseFloat(transactions.avg_score).toFixed(2) : 0,
+      avg_score: transactions?.avg_score
+        ? parseFloat(transactions.avg_score).toFixed(2)
+        : 0,
       by_decision: {
         approve: transactions?.approve || 0,
         review: transactions?.review || 0,
@@ -614,24 +695,24 @@ async function getGlobalStats(req, res) {
 async function getAuditLogs(req, res) {
   const pageNum = parseInt(req.query.page) || 1;
   const limitNum = parseInt(req.query.limit) || 50;
-  const admin_id = req.query.admin_id || '';
-  const action = req.query.action || '';
-  const entity_type = req.query.entity_type || '';
+  const admin_id = req.query.admin_id || "";
+  const action = req.query.action || "";
+  const entity_type = req.query.entity_type || "";
   const offset = (pageNum - 1) * limitNum;
 
-  let whereClause = '1=1';
+  let whereClause = "1=1";
   const params = [];
 
   if (admin_id) {
-    whereClause += ' AND a.admin_id = ?';
+    whereClause += " AND a.admin_id = ?";
     params.push(admin_id);
   }
   if (action) {
-    whereClause += ' AND a.action = ?';
+    whereClause += " AND a.action = ?";
     params.push(action);
   }
   if (entity_type) {
-    whereClause += ' AND a.entity_type = ?';
+    whereClause += " AND a.entity_type = ?";
     params.push(entity_type);
   }
 
