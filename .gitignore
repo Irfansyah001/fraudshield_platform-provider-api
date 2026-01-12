@@ -1,0 +1,51 @@
+# Node.js dependencies
+node_modules/
+
+# Logs
+*.log
+logs/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+dist/
+build/
+
+# IDE files
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.swp
+
+# Coverage reports
+coverage/
+
+# Debug files
+*.stackdump
+*.pid
+
+# Miscellaneous
+*.bak
+*.old
+*.orig
+*.patch
+
+# Ignore sensitive files
+secrets.json
+keys.json
+private.pem
+public.pem
+
+# Ignore portal-specific files
+services/portal/public/
+services/portal/scripts/*.ps1
+services/portal/src/assets/

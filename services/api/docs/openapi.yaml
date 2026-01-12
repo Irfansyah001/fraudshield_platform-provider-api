@@ -1,0 +1,565 @@
+openapi: 3.0.0
+info:
+  title: FraudShield API
+  version: 1.0.0
+  description: |
+    Real-time fraud detection and scoring API for developers.
+    
+    ## Overview
+    FraudShield provides a simple yet powerful API for detecting fraudulent transactions
+    in real-time. Integrate our scoring endpoint to get instant risk assessments for
+    your payment transactions.
+    
+    ## Authentication
+    
+    This API uses two types of authentication:
+    
+    ### JWT Bearer Token (Developer Portal)
+    Used for managing your account, API keys, and blacklist entries.
+    - Obtain a token via `/auth/login`
+    - Include in header: `Authorization: Bearer <token>`
+    
+    ### API Key (Fraud Scoring)
+    Used for the public fraud scoring endpoint.
+    - Generate via `/keys` endpoint
+    - Include in header: `X-API-Key: <your-api-key>`
+    
+    ## Rate Limiting
+    - Public endpoints: 100 requests per minute
+    - Authenticated endpoints: No strict limits
+    
+  contact:
+    name: FraudShield Support
+    email: support@fraudshield.io
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:4000
+    description: Development server
+  - url: https://api.fraudshield.io
+    description: Production server (planned)
+
+tags:
+  - name: Authentication
+    description: Developer account authentication
+  - name: User
+    description: User profile management
+  - name: API Keys
+    description: API key management
+  - name: Blacklist
+    description: Blacklist entry management (CRUD)
+  - name: Fraud Scoring
+    description: Public fraud scoring endpoint
+  - name: Admin
+    description: |
+      Admin endpoints for system management. Requires admin role.
+      
+      **Endpoints:**
+      - `GET /admin/stats` - Global statistics
+      - `GET /admin/users` - List all users
+      - `POST /admin/users` - Create user
+      - `PUT /admin/users/:id` - Update user
+      - `DELETE /admin/users/:id` - Delete user
+      - `GET /admin/keys` - List all API keys
+      - `PATCH /admin/keys/:id/toggle` - Toggle key status
+      - `DELETE /admin/keys/:id` - Delete key
+      - `GET /admin/blacklist` - List all blacklist entries
+      - `PATCH /admin/blacklist/:id/toggle` - Toggle entry status
+      - `DELETE /admin/blacklist/:id` - Delete entry
+      - `GET /admin/transactions` - List all transactions
+      - `GET /admin/audit-logs` - Admin audit logs
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for developer portal authentication
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for fraud scoring endpoint
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        created_at:
+          type: string
+          format: date-time
+
+    ApiKey:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        prefix:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, REVOKED]
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    BlacklistEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [ACCOUNT_ID, MERCHANT_ID, IP, COUNTRY]
+        value:
+          type: string
+        reason:
+          type: string
+          nullable: true
+        active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ScoreRequest:
+      type: object
+      required:
+        - external_txn_id
+        - account_id
+        - amount
+        - currency
+        - available_balance
+      properties:
+        external_txn_id:
+          type: string
+          description: Your unique transaction identifier
+        account_id:
+          type: string
+          description: Customer account identifier
+        amount:
+          type: number
+          description: Transaction amount
+        currency:
+          type: string
+          description: Currency code (e.g., USD)
+        available_balance:
+          type: number
+          description: Account available balance
+        merchant_id:
+          type: string
+          description: Merchant identifier
+        ip:
+          type: string
+          description: Customer IP address
+        country:
+          type: string
+          description: Country code
+        timestamp:
+          type: string
+          format: date-time
+          description: Transaction timestamp (ISO 8601)
+
+    ScoreResponse:
+      type: object
+      properties:
+        request_id:
+          type: string
+          format: uuid
+          description: Unique request identifier
+        decision:
+          type: string
+          enum: [APPROVE, REVIEW, DECLINE]
+          description: Recommended action
+        risk_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Risk score (0-100)
+        triggered_rules:
+          type: array
+          items:
+            type: object
+            properties:
+              rule:
+                type: string
+              severity:
+                type: string
+                enum: [LOW, MEDIUM, HIGH, CRITICAL]
+              reason:
+                type: string
+        processed_at:
+          type: string
+          format: date-time
+
+paths:
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register a new developer account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name:
+                  type: string
+                  example: John Developer
+                email:
+                  type: string
+                  format: email
+                  example: john@example.com
+                password:
+                  type: string
+                  minLength: 8
+                  example: securepassword123
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  access_token:
+                    type: string
+                  token_type:
+                    type: string
+                    example: Bearer
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Email already registered
+
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Login to get access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  access_token:
+                    type: string
+                  token_type:
+                    type: string
+        '401':
+          description: Invalid credentials
+
+  /me:
+    get:
+      tags: [User]
+      summary: Get current user profile
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+
+  /keys:
+    post:
+      tags: [API Keys]
+      summary: Create a new API key
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: Production Key
+      responses:
+        '201':
+          description: API key created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiKey'
+                  - type: object
+                    properties:
+                      api_key:
+                        type: string
+                        description: Full API key (only shown once)
+        '401':
+          description: Unauthorized
+    get:
+      tags: [API Keys]
+      summary: List all API keys
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of API keys
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ApiKey'
+        '401':
+          description: Unauthorized
+
+  /keys/{id}:
+    delete:
+      tags: [API Keys]
+      summary: Revoke an API key
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: API key revoked
+        '401':
+          description: Unauthorized
+        '404':
+          description: API key not found
+
+  /blacklist:
+    post:
+      tags: [Blacklist]
+      summary: Create a new blacklist entry
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, value]
+              properties:
+                type:
+                  type: string
+                  enum: [ACCOUNT_ID, MERCHANT_ID, IP, COUNTRY]
+                value:
+                  type: string
+                reason:
+                  type: string
+      responses:
+        '201':
+          description: Blacklist entry created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlacklistEntry'
+        '409':
+          description: Entry already exists
+    get:
+      tags: [Blacklist]
+      summary: List blacklist entries
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [ACCOUNT_ID, MERCHANT_ID, IP, COUNTRY]
+        - in: query
+          name: active
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List of blacklist entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BlacklistEntry'
+
+  /blacklist/{id}:
+    get:
+      tags: [Blacklist]
+      summary: Get a blacklist entry
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Blacklist entry details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlacklistEntry'
+        '404':
+          description: Entry not found
+    put:
+      tags: [Blacklist]
+      summary: Update a blacklist entry
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [ACCOUNT_ID, MERCHANT_ID, IP, COUNTRY]
+                value:
+                  type: string
+                reason:
+                  type: string
+                active:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated blacklist entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlacklistEntry'
+        '404':
+          description: Entry not found
+    delete:
+      tags: [Blacklist]
+      summary: Delete a blacklist entry
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Entry deleted
+        '404':
+          description: Entry not found
+
+  /v1/score:
+    post:
+      tags: [Fraud Scoring]
+      summary: Score a transaction for fraud risk
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScoreRequest'
+            example:
+              external_txn_id: txn_abc123
+              account_id: acc_user456
+              amount: 150.00
+              currency: USD
+              available_balance: 500.00
+              merchant_id: merchant_789
+              ip: 192.168.1.1
+              country: US
+      responses:
+        '200':
+          description: Fraud score result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoreResponse'
+              example:
+                request_id: 550e8400-e29b-41d4-a716-446655440000
+                decision: APPROVE
+                risk_score: 0
+                triggered_rules: []
+                processed_at: '2025-01-11T10:30:00Z'
+        '400':
+          description: Validation error
+        '401':
+          description: Invalid or missing API key
