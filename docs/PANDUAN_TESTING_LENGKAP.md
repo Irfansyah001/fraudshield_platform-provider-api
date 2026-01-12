@@ -119,13 +119,34 @@ npm run dev
 
 ### 2.4 Test Dashboard
 
+**Catatan UI terbaru (Portal):**
+- Menu umum (Ringkasan, API Keys, Blacklist, Penggunaan, Pengaturan) berada di **top navbar** pada desktop.
+- Pada mobile, menu umum tampil sebagai **bar menu horizontal** (scroll) tepat di bawah header.
+- Menu **Admin Panel** (Admin Dashboard s/d Audit Logs) hanya muncul untuk role **admin** dan berada di **sidebar**.
+
 | No | Test Case | Langkah | Expected Result |
 |----|-----------|---------|-----------------|
-| 1 | Overview | Klik menu "Ringkasan" | Tampil statistik umum |
-| 2 | API Keys | Klik menu "API Keys" | Tampil daftar API keys |
-| 3 | Blacklist | Klik menu "Blacklist" | Tampil daftar blacklist |
-| 4 | Usage | Klik menu "Penggunaan" | Tampil statistik usage |
-| 5 | Settings | Klik menu "Pengaturan" | Tampil form pengaturan |
+| 1 | Overview | Klik menu "Ringkasan" di top navbar (desktop) / bar menu horizontal (mobile) | Tampil statistik umum |
+| 2 | API Keys | Klik menu "API Keys" di top navbar (desktop) / bar menu horizontal (mobile) | Tampil daftar API keys |
+| 3 | Blacklist | Klik menu "Blacklist" di top navbar (desktop) / bar menu horizontal (mobile) | Tampil daftar blacklist |
+| 4 | Usage | Klik menu "Penggunaan" di top navbar (desktop) / bar menu horizontal (mobile) | Tampil statistik usage |
+| 5 | Settings | Klik menu "Pengaturan" di top navbar (desktop) / bar menu horizontal (mobile) | Tampil form pengaturan |
+| 6 | Layout | Scroll halaman dan resize window (desktop ↔ mobile) | Tidak ada elemen bertumpuk; header tetap sticky dan konten rapi |
+
+### 2.5 Test Admin Panel (Khusus Admin)
+
+> Jalankan hanya bila akun yang login memiliki role **admin**.
+
+| No | Test Case | Langkah | Expected Result |
+|----|-----------|---------|-----------------|
+| 1 | Sidebar Admin Muncul | Login sebagai admin lalu buka `/admin` | Sidebar admin tampil di desktop; pada mobile dapat dibuka via tombol menu |
+| 2 | Admin Dashboard | Klik "Admin Dashboard" di sidebar admin | Halaman admin dashboard tampil |
+| 3 | Kelola Users | Klik "Kelola Users" di sidebar admin | Halaman kelola user tampil |
+| 4 | Semua API Keys | Klik "Semua API Keys" di sidebar admin | Halaman daftar API keys (admin) tampil |
+| 5 | Semua Blacklist | Klik "Semua Blacklist" di sidebar admin | Halaman daftar blacklist (admin) tampil |
+| 6 | Transaksi | Klik "Transaksi" di sidebar admin | Halaman transaksi tampil |
+| 7 | Audit Logs | Klik "Audit Logs" di sidebar admin | Halaman audit logs tampil |
+| 8 | Non-Overlap Sidebar | Scroll area menu di sidebar admin | Bagian user info & tombol keluar tetap rapi, tidak menimpa menu |
 
 ---
 
