@@ -27,7 +27,7 @@ Layanan backend inti yang menyediakan:
 - Manajemen blacklist (CRUD)
 - Penilaian penipuan real-time
 
-**Status**: ✅ Sudah Diimplementasi
+**Status**: Sudah Diimplementasi
 
 Lihat [services/api/README.md](services/api/README.md) untuk dokumentasi lengkap.
 
@@ -35,7 +35,7 @@ Lihat [services/api/README.md](services/api/README.md) untuk dokumentasi lengkap
 
 Aplikasi web untuk developer dalam mengelola pengaturan deteksi penipuan.
 
-**Status**: 🚧 Direncanakan
+**Status**: Direncanakan
 
 Lihat [services/portal/README.md](services/portal/README.md) untuk fitur yang direncanakan.
 
@@ -75,7 +75,3 @@ Dokumentasi API: `http://localhost:4000/docs`
 - **Validasi**: Joi
 - **Dokumentasi**: Swagger/OpenAPI 3.0
 - **Keamanan**: Helmet, CORS, Rate Limiting
-
-## Lisensi
-
-MIT
